@@ -221,6 +221,10 @@
 				translateEditor.options.beforeSave( translation );
 			}
 
+
+			
+
+
 			// For responsiveness and efficiency,
 			// immediately move to the next message.
 			translateEditor.next();
@@ -247,6 +251,7 @@
 				if ( editResp.result === 'Success' ) {
 					translateEditor.message.translation = translation;
 					translateEditor.onSaveSuccess();
+					translateEditor.saveOtherSameTranslations(translateEditor.message.title, translateEditor.message.definition, translation, editSummary)
 				} else {
 					translateEditor.onSaveFail( mw.msg( 'tux-save-unknown-error' ) );
 					mw.log( response, xhr );
@@ -282,6 +287,83 @@
 				// Display all the notices whenever an error occurs.
 				translateEditor.showMoreNotices();
 			} );
+
+
+		},
+
+		/**
+		 *  ADDED CODE FOR SPELLS AND GUNS
+		 *	EARCHES THROUGH OTHER UNTRANSLATED MESSAGES
+		 *	IF THERE IS A MATCH, THE TRANSLATION IS ALSO APPLIED TO THEM
+
+		 * @param {string} [title] Title of the translated message.
+		 * @param {string} [definition] Definition of the translated message.
+		 * @param {string} [translation] Translation of the translated message.
+		 * @param {string} [editSummary] editSummary of the translated message, can be empty.
+		 */
+		saveOtherSameTranslations: function (title, definition, translation, editSummary) {
+			
+			var otherStorage = this.storage;
+			console.log("translateEditor.message.title:" + title)
+			var titles = title.split("/")
+			var language = titles[titles.length-1]
+			var undefined
+
+			console.log("language:" + language)
+			console.log("translateEditor.message.definition:" + definition)
+			new mw.Api()
+			.get( {
+				action: 'query',
+				meta: 'messagegroups'
+			} )
+			.then( function ( result ) {
+				return result.query.messagegroups;
+			} ).done( function ( messagegroups ) {
+				console.log(messagegroups) ;
+				for (const group of messagegroups) {
+					console.log("group.id:" + group.id)
+					mw.translate.getMessages(
+						group.id,
+						language,
+						undefined,
+						'max',
+						'!ignored|!optional|!hastranslation'
+					).done( function ( result ) {
+						var messages = result.query.messagecollection;
+
+						console.log("messages:" + messages)
+
+						messages.forEach( function ( othermessage, index ) {
+							if (definition == othermessage.definition){
+								console.log("Saving other same translations")
+								console.log("messothermessageage.title:" + othermessage.title)
+								console.log("othermessage.definition:" + othermessage.definition)
+								console.log("translation:" + translation)
+								console.log("editSummary:" + editSummary)
+								otherStorage.save(
+									othermessage.title,
+									translation,
+									editSummary
+								).done( function ( response, xhr ) {
+									var editResp = response.edit;
+									if ( editResp.result === 'Success' ) {
+										othermessage.translation = translation;
+										othermessage.properties.status = 'translated';
+									} else {
+										mw.log( response, xhr );
+									}
+								} );
+								console.log("SAVING DONE!")
+							}
+		
+						} );
+					} );
+				}
+				
+			});
+
+
+
 		},
 
 		/**
